@@ -234,67 +234,58 @@ class MLTaskPredictor:
 
     async def predict_task_complexity(
         self, 
-        task_features: Dict[str, Any]
+        task: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Predict task complexity and resource requirements
+        Predict task complexity and resource requirements with enhanced robustness
         
         Args:
-            task_features (Dict): Features describing the computational task
+            task (Dict[str, Any]): Input task characteristics
         
         Returns:
-            Dict: Predicted task complexity and resource requirements
+            Dict[str, Any]: Predicted task complexity and resource requirements
         """
         try:
-            # If no historical data, use a default complexity prediction
-            if not self.performance_history:
-                # Create a simple synthetic dataset for initial fitting
-                synthetic_tasks = [
-                    {
-                        'compute_intensity': np.random.uniform(0, 100),
-                        'memory_requirement': np.random.uniform(0, 100),
-                        'complexity_level': np.random.choice([0, 1, 2, 3])
-                    } for _ in range(100)
-                ]
-                
-                # Prepare training data
-                X = np.array([[t['compute_intensity'], t['memory_requirement']] for t in synthetic_tasks])
-                y = np.array([t['complexity_level'] for t in synthetic_tasks])
-                
-                # Fit scalers and models
-                X_scaled = self.complexity_scaler.fit_transform(X)
-                self.complexity_predictor.fit(X_scaled, y)
-            
-            # Prepare input features
-            input_features = np.array([
-                task_features.get('compute_intensity', 0),
-                task_features.get('memory_requirement', 0)
+            # Normalize input features
+            features = np.array([
+                task.get('compute_intensity', 0),
+                task.get('memory_requirement', 0),
+                task.get('data_volume', 0),
+                task.get('priority', 3)  # Default to medium priority
             ]).reshape(1, -1)
             
-            # Scale input features
-            input_features_scaled = self.complexity_scaler.transform(input_features)
+            normalized_features = self.complexity_scaler.transform(features)
             
-            # Predict complexity
-            complexity_prediction = self.complexity_predictor.predict(input_features_scaled)[0]
+            # Predict complexity level
+            complexity_prediction = self.complexity_predictor.predict(normalized_features)[0]
+            complexity_proba = self.complexity_predictor.predict_proba(normalized_features)[0]
             
-            # Map prediction to complexity level
-            complexity_map = {
-                0: 'LOW',
-                1: 'MEDIUM',
-                2: 'HIGH',
-                3: 'CRITICAL'
+            # Predict resource requirements
+            resource_prediction = self.resource_predictor.predict(normalized_features)[0]
+            
+            # Construct result with confidence
+            result = {
+                'complexity_level': TaskComplexityLevel(complexity_prediction).name,
+                'complexity_confidence': max(complexity_proba),
+                'estimated_resources': resource_prediction,
+                'task_id': str(uuid.uuid4())  # Unique task identifier
             }
             
-            return {
-                'status': 'success',
-                'complexity_level': complexity_map[complexity_prediction],
-                'raw_complexity_score': complexity_prediction
-            }
+            # Update performance tracking
+            self.model_performance['total_tasks_analyzed'] += 1
+            
+            self.logger.info(f"Task Complexity Prediction: {result}")
+            
+            return result
+        
         except Exception as e:
             self.logger.error(f"Task complexity prediction failed: {e}")
             return {
-                'status': 'error',
-                'message': str(e)
+                'complexity_level': TaskComplexityLevel.MEDIUM.name,
+                'complexity_confidence': 0.5,
+                'estimated_resources': 0.5,
+                'task_id': str(uuid.uuid4()),
+                'error': str(e)
             }
 
     def _update_performance_history(
@@ -370,6 +361,130 @@ class MLTaskPredictor:
             'performance_history_size': len(self.performance_history)
         }
 
+    def generate_synthetic_training_data(
+        self, 
+        num_samples: int = 1000, 
+        noise_level: float = 0.1
+    ) -> Dict[str, np.ndarray]:
+        """
+        Generate synthetic training data for task complexity prediction
+        
+        Args:
+            num_samples (int): Number of synthetic samples to generate
+            noise_level (float): Amount of random noise to add to features
+        
+        Returns:
+            Dict[str, np.ndarray]: Prepared training datasets
+        """
+        np.random.seed(42)  # Ensure reproducibility
+        
+        # Generate synthetic features
+        compute_intensity = np.random.uniform(0, 100, num_samples)
+        memory_requirement = np.random.uniform(0, 100, num_samples)
+        data_volume = np.random.uniform(10, 1000, num_samples)
+        priority = np.random.randint(1, 6, num_samples)
+        
+        # Add some controlled noise
+        compute_intensity += np.random.normal(0, noise_level * compute_intensity)
+        memory_requirement += np.random.normal(0, noise_level * memory_requirement)
+        
+        # Define complexity labels based on features
+        def assign_complexity(compute, memory, data, priority):
+            complexity_score = (
+                0.4 * compute + 
+                0.3 * memory + 
+                0.2 * data + 
+                0.1 * priority
+            )
+            
+            if complexity_score < 25:
+                return TaskComplexityLevel.LOW.value
+            elif complexity_score < 50:
+                return TaskComplexityLevel.MEDIUM.value
+            elif complexity_score < 75:
+                return TaskComplexityLevel.HIGH.value
+            else:
+                return TaskComplexityLevel.CRITICAL.value
+        
+        complexity_labels = [
+            assign_complexity(comp, mem, vol, pri)
+            for comp, mem, vol, pri in zip(
+                compute_intensity, 
+                memory_requirement, 
+                data_volume, 
+                priority
+            )
+        ]
+        
+        # Prepare features matrix
+        X = np.column_stack([
+            compute_intensity, 
+            memory_requirement, 
+            data_volume, 
+            priority
+        ])
+        
+        y = np.array(complexity_labels)
+        
+        # Fit scalers and transform data
+        X_scaled = self.complexity_scaler.fit_transform(X)
+        
+        # Train models
+        self.complexity_predictor.fit(X_scaled, y)
+        
+        # Optional: Train resource predictor
+        resource_labels = (
+            0.5 * compute_intensity + 
+            0.3 * memory_requirement + 
+            0.2 * data_volume
+        )
+        self.resource_predictor.fit(X_scaled, resource_labels)
+        
+        self.logger.info(
+            f"Generated {num_samples} synthetic training samples. "
+            f"Complexity prediction accuracy: {self.complexity_predictor.score(X_scaled, y):.2%}"
+        )
+        
+        return {
+            'features': X_scaled,
+            'complexity_labels': y,
+            'resource_labels': resource_labels
+        }
+
+    def evaluate_model_performance(self) -> Dict[str, float]:
+        """
+        Evaluate and log model performance metrics
+        
+        Returns:
+            Dict[str, float]: Performance metrics
+        """
+        # Generate test data
+        test_data = self.generate_synthetic_training_data(num_samples=500)
+        
+        # Complexity prediction evaluation
+        complexity_predictions = self.complexity_predictor.predict(test_data['features'])
+        complexity_accuracy = accuracy_score(
+            test_data['complexity_labels'], 
+            complexity_predictions
+        )
+        
+        # Resource prediction evaluation
+        resource_predictions = self.resource_predictor.predict(test_data['features'])
+        resource_mse = mean_squared_error(
+            test_data['resource_labels'], 
+            resource_predictions
+        )
+        
+        performance_metrics = {
+            'complexity_accuracy': complexity_accuracy,
+            'resource_prediction_mse': resource_mse,
+            'total_tasks_analyzed': self.model_performance['total_tasks_analyzed']
+        }
+        
+        self.logger.info(f"Model Performance Metrics: {performance_metrics}")
+        
+        return performance_metrics
+
 def main():
     """
     Demonstration of ML Task Predictor
@@ -414,6 +529,13 @@ def main():
         # Get model performance
         performance = task_predictor.get_model_performance()
         print("Model Performance:", performance)
+        
+        # Generate synthetic training data
+        synthetic_data = task_predictor.generate_synthetic_training_data()
+        
+        # Evaluate model performance
+        model_performance = task_predictor.evaluate_model_performance()
+        print("Model Performance Metrics:", model_performance)
     
     # Run the example
     asyncio.run(example_usage())
