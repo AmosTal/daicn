@@ -30,3 +30,6 @@ uuid==1.30
 
 # System Orchestration Dependencies
 asyncio==3.4.3
+
+# System Diagnostics Dependencies
+traceback==0.3.0
