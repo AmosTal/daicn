@@ -18,3 +18,8 @@ uuid==1.30
 
 # Resource Management Dependencies
 uuid==1.30
+
+# Machine Learning Dependencies
+scikit-learn==1.3.2
+numpy==1.26.2
+pandas==2.1.3
