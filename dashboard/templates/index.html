@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAICN Network Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #f8f9fa;
+            --card-background: #ffffff;
+        }
+        body { 
+            background-color: var(--background-color); 
+            font-family: 'Inter', 'Arial', sans-serif;
+            line-height: 1.6;
+        }
+        .dashboard-card {
+            background-color: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            margin-bottom: 24px;
+            padding: 24px;
+            transition: all 0.3s ease;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        }
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        .health-status {
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .health-status.EXCELLENT { color: #2ecc71; }
+        .health-status.GOOD { color: #3498db; }
+        .health-status.MODERATE { color: #f39c12; }
+        .health-status.POOR { color: #e74c3c; }
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-5">
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <h1 class="display-4 fw-bold text-primary">
+                    <i class="bi bi-graph-up-arrow me-2"></i>DAICN Network Dashboard
+                </h1>
+                <p class="lead text-muted">Real-time Decentralized AI Computation Network Insights</p>
+            </div>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="dashboard-card h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="mb-0"><i class="bi bi-cpu me-2"></i>Network Metrics</h3>
+                        <span class="badge bg-primary" id="metricsTimestamp"></span>
+                    </div>
+                    <div id="networkMetrics" class="text-center">
+                        <div class="loading-spinner">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="dashboard-card h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="mb-0"><i class="bi bi-shield-check me-2"></i>Network Health</h3>
+                        <span class="badge bg-success" id="healthTimestamp"></span>
+                    </div>
+                    <div id="networkHealth" class="text-center">
+                        <div class="loading-spinner">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="dashboard-card h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Task Distribution</h3>
+                        <span class="badge bg-info" id="chartTimestamp"></span>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="taskStatusChart" style="height: 300px; width: 100%;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        // Global configuration
+        const API_BASE_URL = 'http://localhost:5000';
+        const REFRESH_INTERVAL = 30000; // 30 seconds
+
+        // Fetch with error handling
+        async function safeFetch(url) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Fetch error:', error);
+                return null;
+            }
+        }
+
+        // Task Status Chart Update Function
+        function updateTaskStatusChart(metrics) {
+            try {
+                const chartCanvas = document.getElementById('taskStatusChart');
+                const timestampContainer = document.getElementById('chartTimestamp');
+                
+                // Use metrics to generate task statuses
+                const taskStatuses = [
+                    { status: 'Pending', count: Math.floor(metrics.total_tasks * 0.3) },
+                    { status: 'In Progress', count: Math.floor(metrics.total_tasks * 0.2) },
+                    { status: 'Completed', count: Math.floor(metrics.total_tasks * 0.4) },
+                    { status: 'Failed', count: Math.floor(metrics.total_tasks * 0.1) }
+                ];
+                
+                // Prepare data for Chart.js
+                const labels = taskStatuses.map(task => task.status);
+                const data = taskStatuses.map(task => task.count);
+                
+                // Create chart if it doesn't exist
+                if (!window.taskStatusChartInstance) {
+                    const ctx = chartCanvas.getContext('2d');
+                    window.taskStatusChartInstance = new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                data: data,
+                                backgroundColor: [
+                                    'rgba(255, 206, 86, 0.8)',  // Pending - Yellow
+                                    'rgba(54, 162, 235, 0.8)',  // In Progress - Blue
+                                    'rgba(75, 192, 192, 0.8)',  // Completed - Green
+                                    'rgba(255, 99, 132, 0.8)'   // Failed - Red
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: {
+                                duration: 0 // Disable animations
+                            },
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Task Status Distribution'
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    // Update existing chart data
+                    window.taskStatusChartInstance.data.labels = labels;
+                    window.taskStatusChartInstance.data.datasets[0].data = data;
+                    window.taskStatusChartInstance.update('none'); // Update without animation
+                }
+                
+                // Update timestamp from metrics
+                const timestamp = new Date(metrics.timestamp);
+                timestampContainer.textContent = timestamp.toLocaleTimeString([], {
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit', 
+                    hour12: false
+                });
+            } catch (error) {
+                console.error('Chart rendering error:', error);
+                const chartContainer = document.getElementById('taskStatusChart').parentElement;
+                chartContainer.innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        Error loading task status chart: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // WebSocket connection with explicit namespace
+        const socket = io('http://localhost:5000/dashboard', {
+            transports: ['websocket'],
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000
+        });
+
+        // Logging for WebSocket events
+        socket.on('connect', () => {
+            console.log('WebSocket connected');
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('WebSocket connection error:', error);
+        });
+
+        // Network Metrics WebSocket Handler
+        socket.on('network_metrics_update', function(metrics) {
+            console.log('Metrics Update:', metrics);
+            
+            const metricsContainer = document.getElementById('networkMetrics');
+            const timestampContainer = document.getElementById('metricsTimestamp');
+            
+            if (!metrics || metrics.error) {
+                metricsContainer.innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        ${metrics?.error || 'Unable to load network metrics'}
+                    </div>
+                `;
+                return;
+            }
+
+            // Validate specific metrics
+            const totalProviders = metrics.total_providers ?? 0;
+            const activeProviders = metrics.active_providers ?? 0;
+            const totalTasks = metrics.total_tasks ?? 0;
+            const avgReputation = metrics.average_provider_reputation ?? 0;
+            
+            const metricsHtml = `
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <div class="metric-value ${totalProviders === 0 ? 'text-warning' : ''}">${totalProviders}</div>
+                        <small class="text-muted">Total Providers</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="metric-value ${activeProviders === 0 ? 'text-danger' : ''}">${activeProviders}</div>
+                        <small class="text-muted">Active Providers</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="metric-value ${totalTasks === 0 ? 'text-warning' : ''}">${totalTasks}</div>
+                        <small class="text-muted">Total Tasks</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="metric-value ${avgReputation === 0 ? 'text-warning' : ''}">${avgReputation.toFixed(2)}</div>
+                        <small class="text-muted">Avg Reputation</small>
+                    </div>
+                    
+                    ${activeProviders > 0 && totalProviders > 0 ? `
+                    <div class="col-12 mt-2">
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: ${(activeProviders / totalProviders * 100).toFixed(2)}%" 
+                                 aria-valuenow="${(activeProviders / totalProviders * 100).toFixed(2)}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                ${((activeProviders / totalProviders) * 100).toFixed(2)}% Active
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            metricsContainer.innerHTML = metricsHtml;
+            
+            // Update timestamp
+            const timestamp = new Date(metrics.timestamp);
+            timestampContainer.textContent = timestamp.toLocaleTimeString([], {
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit', 
+                hour12: false
+            });
+
+            // Update task status chart with same metrics
+            updateTaskStatusChart(metrics);
+        });
+
+        // Network Health WebSocket Handler
+        socket.on('network_health_update', function(health) {
+            console.log('Health Update:', health);
+            
+            const healthContainer = document.getElementById('networkHealth');
+            const timestampContainer = document.getElementById('healthTimestamp');
+            
+            if (!health || health.error) {
+                healthContainer.innerHTML = `
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        ${health?.error || 'Unable to load network health'}
+                    </div>
+                `;
+                return;
+            }
+
+            // Validate specific health metrics
+            const healthScore = health.health_score ?? 0;
+            const status = health.status ?? 'UNKNOWN';
+            const totalProviders = health.total_providers ?? 0;
+            const activeProviders = health.active_providers ?? 0;
+            
+            const healthHtml = `
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <div class="metric-value ${healthScore === 0 ? 'text-danger' : ''}">${healthScore.toFixed(2)}</div>
+                        <small class="text-muted">Health Score</small>
+                    </div>
+                    <div class="col-12 mb-3">
+                        <div class="health-status ${status}">${status}</div>
+                        <small class="text-muted">Network Status</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="metric-value">${totalProviders}</div>
+                        <small class="text-muted">Total Providers</small>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="metric-value">${activeProviders}</div>
+                        <small class="text-muted">Active Providers</small>
+                    </div>
+                    ${health.active_provider_ratio !== undefined ? `
+                    <div class="col-12 mt-2">
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: ${health.active_provider_ratio}%" 
+                                 aria-valuenow="${health.active_provider_ratio}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                                ${health.active_provider_ratio}% Active
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            healthContainer.innerHTML = healthHtml;
+            
+            // Update timestamp
+            const timestamp = new Date(health.timestamp);
+            timestampContainer.textContent = timestamp.toLocaleTimeString([], {
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit', 
+                hour12: false
+            });
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

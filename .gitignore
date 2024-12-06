@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+env/
+.env/
+.venv/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Large binary files and libraries
+*.dll
+*.pyd
+*.so
+*.lib
+
+# Machine Learning and Deep Learning specific
+*.h5
+*.model
+*.pkl
+*.joblib
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Specific large library directories
+venv/Lib/site-packages/torch/
+venv/Lib/site-packages/tensorflow/
+venv/Lib/site-packages/jaxlib/
+venv/Lib/site-packages/clang/
+
+# Dependency caches
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
