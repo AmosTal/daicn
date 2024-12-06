@@ -7,11 +7,11 @@ from enum import Enum, auto
 from dataclasses import dataclass, field
 
 # Import modules from previous development phases
-from backend.task_queue.task_queue import TaskQueue
+from backend.task_queue.task_queue import DistributedTaskQueue as TaskQueue
 from backend.resource_management.resource_allocator import ResourceAllocationOptimizer
 from backend.ml.task_predictor import MLTaskPredictor
 from backend.security.auth_manager import AuthenticationManager, UserRole
-from backend.communication.inter_component_protocol import MessageBroker
+from backend.communication.inter_component_protocol import InterComponentCommunicationProtocol as MessageBroker
 
 class SystemState(Enum):
     """Enumeration of overall system operational states"""
@@ -83,7 +83,7 @@ class SystemOrchestrator:
         self.resource_allocator = ResourceAllocationOptimizer()
         self.ml_task_predictor = MLTaskPredictor()
         self.auth_manager = AuthenticationManager()
-        self.message_broker = MessageBroker()
+        self.message_broker = MessageBroker('system_orchestrator')
         
         # Performance and optimization tracking
         self.performance_history: List[Dict[str, Any]] = []

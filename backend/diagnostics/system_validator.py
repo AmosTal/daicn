@@ -8,7 +8,8 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, asdict
 
 # Import modules from other components
-from backend.task_queue.task_queue import TaskQueue
+from backend.communication.inter_component_protocol import InterComponentCommunicationProtocol as MessageBroker
+from backend.task_queue.task_queue import DistributedTaskQueue as TaskQueue
 from backend.resource_management.resource_allocator import ResourceAllocationOptimizer
 from backend.ml.task_predictor import MLTaskPredictor
 from backend.security.auth_manager import AuthenticationManager
