@@ -12,3 +12,9 @@ uuid==1.30
 
 # Inter-Component Communication Dependencies
 asyncio==3.4.3
+
+# Resilience and Fault Tolerance Dependencies
+uuid==1.30
+
+# Resource Management Dependencies
+uuid==1.30
