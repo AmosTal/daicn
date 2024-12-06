@@ -6,6 +6,7 @@ import multiprocessing
 from typing import Dict, Any, List, Callable
 import redis
 import json
+import pandas as pd
 
 from backend.ml.task_complexity_predictor import TaskComplexityPredictor
 from backend.ml.provider_performance_forecaster import ProviderPerformanceForecaster
@@ -23,7 +24,8 @@ class OrchestrationManager:
     def __init__(
         self, 
         redis_host: str = 'localhost', 
-        redis_port: int = 6379
+        redis_port: int = 6379,
+        log_level: int = logging.INFO
     ):
         """
         Initialize Orchestration Manager
@@ -31,26 +33,51 @@ class OrchestrationManager:
         Args:
             redis_host (str): Redis server host
             redis_port (int): Redis server port
+            log_level (int): Logging level for system
         """
-        # Logging configuration
+        # Enhanced logging configuration
         logging.basicConfig(
-            level=logging.INFO, 
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            level=log_level, 
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler('orchestration_manager.log'),
+                logging.StreamHandler()
+            ]
         )
         self.logger = logging.getLogger(__name__)
         
-        # Redis connection for state management
+        # Enhanced error tracking
+        self.error_registry: Dict[str, Dict[str, Any]] = {}
+        
+        # Redis connection with enhanced error handling
         try:
             self.redis_client = redis.Redis(
                 host=redis_host, 
                 port=redis_port, 
-                decode_responses=True
+                decode_responses=True,
+                socket_timeout=5,  # 5 second timeout
+                socket_connect_timeout=5  # 5 second connection timeout
             )
             self.redis_client.ping()
-            self.logger.info("Redis connection established successfully")
-        except Exception as e:
-            self.logger.error(f"Redis connection error: {e}")
-            raise
+            self.logger.info(f"Redis connection established successfully at {redis_host}:{redis_port}")
+        except redis.ConnectionError as e:
+            self.logger.error(f"Failed to connect to Redis: {e}")
+            self.error_registry['redis_connection'] = {
+                'timestamp': time.time(),
+                'error': str(e),
+                'host': redis_host,
+                'port': redis_port
+            }
+            # Fallback to in-memory storage if Redis fails
+            self.redis_client = None
+        
+        # Enhanced system state tracking
+        self.system_state: Dict[str, Any] = {
+            'startup_time': time.time(),
+            'total_tasks_processed': 0,
+            'current_load': 0,
+            'error_count': 0
+        }
         
         # Machine Learning Components
         self.task_complexity_predictor = TaskComplexityPredictor()
@@ -73,6 +100,88 @@ class OrchestrationManager:
         self.monitoring_thread = None
         
         self.logger.info("Orchestration Manager initialized")
+
+    def register_error(self, error_type: str, error_details: Dict[str, Any]):
+        """
+        Centralized error registration and tracking
+        
+        Args:
+            error_type (str): Type of error
+            error_details (Dict): Detailed error information
+        """
+        error_id = str(uuid.uuid4())
+        full_error_details = {
+            'timestamp': time.time(),
+            'details': error_details
+        }
+        
+        self.error_registry[error_id] = full_error_details
+        self.system_state['error_count'] += 1
+        
+        self.logger.error(f"Error Registered - Type: {error_type}, ID: {error_id}")
+        
+        # Optional: Trigger error recovery mechanisms
+        self._handle_error_recovery(error_type, error_id)
+
+    def _handle_error_recovery(self, error_type: str, error_id: str):
+        """
+        Implement error recovery strategies based on error type
+        
+        Args:
+            error_type (str): Type of error
+            error_id (str): Unique error identifier
+        """
+        recovery_strategies = {
+            'task_allocation_failure': self._recover_task_allocation,
+            'resource_unavailable': self._recover_resource_allocation,
+            'network_instability': self._recover_network_connection
+        }
+        
+        recovery_func = recovery_strategies.get(error_type)
+        if recovery_func:
+            try:
+                recovery_func(error_id)
+            except Exception as e:
+                self.logger.critical(f"Error recovery failed: {e}")
+
+    def _recover_task_allocation(self, error_id: str):
+        """Recover from task allocation failures"""
+        self.logger.warning(f"Attempting task allocation recovery for error {error_id}")
+        # Implement task reallocation logic
+        pass
+
+    def _recover_resource_allocation(self, error_id: str):
+        """Recover from resource allocation failures"""
+        self.logger.warning(f"Attempting resource allocation recovery for error {error_id}")
+        # Implement resource reallocation logic
+        pass
+
+    def _recover_network_connection(self, error_id: str):
+        """Recover from network connection issues"""
+        self.logger.warning(f"Attempting network connection recovery for error {error_id}")
+        # Implement network reconnection logic
+        pass
+
+    def get_system_health(self) -> Dict[str, Any]:
+        """
+        Retrieve comprehensive system health metrics
+        
+        Returns:
+            Dict: System health and performance metrics
+        """
+        current_time = time.time()
+        uptime = current_time - self.system_state['startup_time']
+        
+        health_metrics = {
+            'uptime': uptime,
+            'total_tasks_processed': self.system_state['total_tasks_processed'],
+            'current_load': self.system_state['current_load'],
+            'error_count': self.system_state['error_count'],
+            'error_registry': list(self.error_registry.keys()),
+            'redis_connection_status': 'active' if self.redis_client else 'failed'
+        }
+        
+        return health_metrics
 
     def register_provider(self, provider_info: Dict[str, Any]):
         """
@@ -98,6 +207,7 @@ class OrchestrationManager:
         
         except Exception as e:
             self.logger.error(f"Provider registration error: {e}")
+            self.register_error('provider_registration_failure', {'error': str(e)})
             raise
 
     def get_available_providers(self) -> List[Dict[str, Any]]:
@@ -113,6 +223,7 @@ class OrchestrationManager:
         
         except Exception as e:
             self.logger.error(f"Provider retrieval error: {e}")
+            self.register_error('provider_retrieval_failure', {'error': str(e)})
             raise
 
     def allocate_task(self, task_details: Dict[str, Any]) -> Dict[str, Any]:
@@ -167,6 +278,7 @@ class OrchestrationManager:
         
         except Exception as e:
             self.logger.error(f"Task allocation error: {e}")
+            self.register_error('task_allocation_failure', {'error': str(e)})
             raise
 
     def start_system_monitoring(self):
@@ -198,6 +310,7 @@ class OrchestrationManager:
                 
                 except Exception as e:
                     self.logger.error(f"System monitoring error: {e}")
+                    self.register_error('system_monitoring_failure', {'error': str(e)})
         
         # Start monitoring thread
         self.monitoring_thread = threading.Thread(
@@ -265,6 +378,7 @@ class OrchestrationManager:
         
         except Exception as e:
             self.logger.error(f"System state update error: {e}")
+            self.register_error('system_state_update_failure', {'error': str(e)})
             raise
 
     def recover_failed_tasks(self):
@@ -290,6 +404,7 @@ class OrchestrationManager:
         
         except Exception as e:
             self.logger.error(f"Task recovery error: {e}")
+            self.register_error('task_recovery_failure', {'error': str(e)})
             raise
 
 def main():

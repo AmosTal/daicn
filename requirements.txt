@@ -6,3 +6,9 @@ gunicorn==21.2.0
 flask-socketio==5.3.6
 python-socketio==5.11.4
 eventlet==0.33.3
+
+# Task Queue Dependencies
+uuid==1.30
+
+# Inter-Component Communication Dependencies
+asyncio==3.4.3
