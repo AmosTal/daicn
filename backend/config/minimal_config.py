@@ -28,13 +28,23 @@ class MinimalConfigurationManager:
         },
         'system': {
             'max_concurrent_tasks': 10,
+            'max_nodes': 3,  # Support for up to 3 nodes
+            'node_heartbeat_interval': 30,  # seconds
+            'cluster_sync_interval': 60,  # seconds
+            'resource_allocation': {
+                'cpu_threshold': 80,  # percent
+                'memory_threshold': 80,  # percent
+                'load_balance_threshold': 0.2  # 20% difference triggers rebalancing
+            },
             'task_timeout_minutes': 5,
             'log_level': 'INFO'
         },
         'security': {
             'password_min_length': 8,
             'max_login_attempts': 5,
-            'token_expiry_hours': 24
+            'token_expiry_hours': 24,
+            'auth_required': True,
+            'token_expiry': 3600
         },
         'ml': {
             'complexity_prediction_threshold': 0.5,
@@ -43,6 +53,11 @@ class MinimalConfigurationManager:
         'resources': {
             'cpu_allocation_percentage': 60,
             'memory_allocation_percentage': 70
+        },
+        'redis': {
+            'host': 'localhost',
+            'port': 6379,
+            'db': 0
         }
     }
     

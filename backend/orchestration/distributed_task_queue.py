@@ -20,7 +20,9 @@ class DistributedTaskQueue:
         self, 
         redis_host: str = 'localhost', 
         redis_port: int = 6379,
-        max_workers: int = None
+        max_workers: int = None,
+        node_id: str = None,
+        cluster_size: int = 3  # Support for up to 3 nodes
     ):
         """
         Initialize Distributed Task Queue
@@ -29,6 +31,8 @@ class DistributedTaskQueue:
             redis_host (str): Redis server host
             redis_port (int): Redis server port
             max_workers (int): Maximum number of concurrent workers
+            node_id (str): Unique identifier for this node
+            cluster_size (int): Total number of nodes in cluster (max 3)
         """
         # Logging configuration
         logging.basicConfig(
@@ -36,6 +40,11 @@ class DistributedTaskQueue:
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         self.logger = logging.getLogger(__name__)
+        
+        # Node configuration
+        self.node_id = node_id or str(uuid.uuid4())
+        self.cluster_size = min(cluster_size, 3)  # Cap at 3 nodes
+        self.node_registry_key = 'daicn:node_registry'
         
         # Redis connection for distributed queue
         try:
@@ -45,14 +54,15 @@ class DistributedTaskQueue:
                 decode_responses=True
             )
             self.redis_client.ping()
-            self.logger.info("Redis connection established successfully")
+            self._register_node()
+            self.logger.info(f"Redis connection established successfully for node {self.node_id}")
         except Exception as e:
             self.logger.error(f"Redis connection error: {e}")
             raise
         
         # Task queue configuration
-        self.task_queue_name = 'daicn:task_queue'
-        self.result_queue_name = 'daicn:result_queue'
+        self.task_queue_name = f'daicn:task_queue:{self.node_id}'
+        self.result_queue_name = f'daicn:result_queue:{self.node_id}'
         
         # Concurrency management
         self.max_workers = max_workers or (multiprocessing.cpu_count() * 2)
@@ -62,7 +72,38 @@ class DistributedTaskQueue:
         self.active_tasks = {}
         self.task_lock = threading.Lock()
         
-        self.logger.info(f"Distributed Task Queue initialized with {self.max_workers} workers")
+        self.logger.info(f"Distributed Task Queue initialized with {self.max_workers} workers on node {self.node_id}")
+
+    def _register_node(self):
+        """Register this node with the cluster"""
+        with self.redis_client.pipeline() as pipe:
+            while True:
+                try:
+                    # Watch the node registry
+                    pipe.watch(self.node_registry_key)
+                    
+                    # Get current nodes
+                    current_nodes = pipe.hgetall(self.node_registry_key)
+                    
+                    if len(current_nodes) >= self.cluster_size:
+                        raise Exception(f"Cluster already at maximum size ({self.cluster_size} nodes)")
+                    
+                    # Start transaction
+                    pipe.multi()
+                    
+                    # Register this node
+                    pipe.hset(self.node_registry_key, self.node_id, json.dumps({
+                        'registered_at': time.time(),
+                        'last_heartbeat': time.time(),
+                        'max_workers': self.max_workers
+                    }))
+                    
+                    # Execute transaction
+                    pipe.execute()
+                    break
+                    
+                except redis.WatchError:
+                    continue
 
     def enqueue_task(
         self, 
@@ -304,7 +345,7 @@ def example_task(x: int, y: int) -> int:
 
 def main():
     # Initialize distributed task queue
-    task_queue = DistributedTaskQueue()
+    task_queue = DistributedTaskQueue(node_id='node-1')
     
     # Start worker threads
     task_queue.start_workers(num_workers=4)

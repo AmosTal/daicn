@@ -52,7 +52,9 @@ class SystemOrchestrator:
         self, 
         log_level: int = logging.INFO,
         heartbeat_interval: int = 60,  # seconds
-        health_threshold: float = 0.7
+        health_threshold: float = 0.7,
+        node_id: str = None,
+        cluster_size: int = 3  # Support for up to 3 nodes
     ):
         """
         Initialize System Orchestrator
@@ -61,6 +63,8 @@ class SystemOrchestrator:
             log_level (int): Logging configuration
             heartbeat_interval (int): Interval for component health checks
             health_threshold (float): Minimum health score for optimal operation
+            node_id (str): Unique identifier for this node
+            cluster_size (int): Total number of nodes in cluster (max 3)
         """
         # Logging configuration
         logging.basicConfig(
@@ -68,6 +72,10 @@ class SystemOrchestrator:
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         self.logger = logging.getLogger(__name__)
+        
+        # Node configuration
+        self.node_id = node_id or str(uuid.uuid4())
+        self.cluster_size = min(cluster_size, 3)  # Cap at 3 nodes
         
         # System state management
         self.system_state = SystemState.INITIALIZING
@@ -78,9 +86,9 @@ class SystemOrchestrator:
         self.components: Dict[str, SystemComponent] = {}
         self.event_log: List[Dict[str, Any]] = []
         
-        # Subsystem integrations
-        self.task_queue = TaskQueue()
-        self.resource_allocator = ResourceAllocationOptimizer()
+        # Subsystem integrations with node awareness
+        self.task_queue = TaskQueue(node_id=self.node_id, cluster_size=self.cluster_size)
+        self.resource_allocator = ResourceAllocationOptimizer(node_id=self.node_id)
         self.ml_task_predictor = MLTaskPredictor()
         self.auth_manager = AuthenticationManager()
         self.message_broker = MessageBroker('system_orchestrator')
@@ -88,7 +96,7 @@ class SystemOrchestrator:
         # Performance and optimization tracking
         self.performance_history: List[Dict[str, Any]] = []
         
-        self.logger.info("System Orchestrator initialized")
+        self.logger.info(f"System Orchestrator initialized on node {self.node_id}")
 
     def register_component(
         self, 
@@ -213,9 +221,12 @@ class SystemOrchestrator:
 
     async def optimize_resource_allocation(self):
         """
-        Dynamically optimize resource allocation based on system performance
+        Dynamically optimize resource allocation across nodes based on system performance
         """
         try:
+            # Retrieve performance metrics from all nodes
+            node_metrics = await self._get_cluster_metrics()
+            
             # Retrieve performance metrics from components
             component_metrics = {
                 name: component.performance_metrics 
@@ -224,22 +235,40 @@ class SystemOrchestrator:
             
             # Use ML task predictor for intelligent allocation
             task_complexity_prediction = await self.ml_task_predictor.predict_task_complexity(
-                component_metrics
+                {**node_metrics, **component_metrics}
             )
             
-            # Optimize resource allocation
+            # Optimize resource allocation across nodes
             allocation_result = await self.resource_allocator.allocate_resources(
-                task_complexity_prediction
+                task_complexity_prediction,
+                node_metrics
             )
             
             # Log resource allocation event
             self._log_system_event(
                 OrchestrationEvent.RESOURCE_SCALING,
-                f"Resource allocation optimized: {allocation_result}"
+                f"Resource allocation optimized across nodes: {allocation_result}"
             )
         
         except Exception as e:
             self.logger.error(f"Resource allocation optimization failed: {e}")
+
+    async def _get_cluster_metrics(self) -> Dict[str, Any]:
+        """Get performance metrics from all nodes in the cluster"""
+        try:
+            cluster_metrics = {}
+            for node_id in self.task_queue.get_cluster_nodes():
+                node_status = await self.task_queue.get_node_status(node_id)
+                cluster_metrics[node_id] = {
+                    'cpu_usage': node_status.get('cpu_usage', 0),
+                    'memory_usage': node_status.get('memory_usage', 0),
+                    'task_count': node_status.get('task_count', 0),
+                    'worker_count': node_status.get('worker_count', 0)
+                }
+            return cluster_metrics
+        except Exception as e:
+            self.logger.error(f"Failed to get cluster metrics: {e}")
+            return {}
 
     async def monitor_system_health(self):
         """
