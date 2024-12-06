@@ -1,0 +1,55 @@
+name: DAICN MVP Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.11]
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+    
+    - name: Run unit tests
+      run: |
+        python -m pytest tests/ -v
+    
+    - name: Performance testing
+      run: |
+        python -m pytest tests/ --benchmark-enable
+    
+    - name: Type checking
+      run: |
+        mypy backend/
+    
+    - name: Security scanning
+      run: |
+        bandit -r backend/
+        safety check
+    
+    - name: Code formatting
+      run: |
+        black --check backend/
+        isort --check backend/
+    
+    - name: Coverage report
+      run: |
+        coverage run -m pytest
+        coverage report -m

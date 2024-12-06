@@ -1,0 +1,20 @@
+# Development Dependencies
+pytest==7.4.4
+pytest-asyncio==0.23.3
+coverage==7.4.4
+mypy==1.8.0
+black==24.3.0
+isort==5.13.2
+flake8==7.0.0
+hypothesis==6.95.3
+
+# Test Performance and Profiling
+pytest-benchmark==4.0.0
+memory-profiler==0.61.0
+
+# Type Checking and Linting
+types-all==1.0.0
+
+# Security Scanning
+bandit==1.7.7
+safety==3.0.1
