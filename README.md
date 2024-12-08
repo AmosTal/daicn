@@ -2,146 +2,75 @@
 
 ## 🌐 Project Vision
 
-DAICN is a revolutionary blockchain-powered platform that democratizes AI computational resources through a distributed, tokenized marketplace.
+DAICN is an innovative distributed computing platform designed to democratize AI computational resources through a flexible, secure, and efficient network.
 
-## 🎯 Problem Statement
-
-Current AI computing landscape is:
-- Centralized around big cloud providers
-- Expensive for small teams and researchers
-- Limited by geographical and financial constraints
-- Lacks transparency and fair resource allocation
-
-## 💡 Our Solution
-
-DAICN creates a peer-to-peer network where:
-- Anyone can contribute computational resources
-- AI tasks are efficiently distributed
-- Providers earn tokens for their computing power
-- Clients access affordable, scalable AI infrastructure
-
-## 🚀 Key Features
-
-### 1. Decentralized Compute Marketplace
-- Peer-to-peer GPU/CPU resource sharing
-- Transparent task allocation
-- Fair compensation mechanism
-
-### 2. Tokenized Incentive System
-- Earn tokens by providing computational resources
-- Pay for AI tasks using network tokens
-- Transparent and low-cost transactions
-
-### 3. Advanced Network Monitoring
-- Real-time dashboard tracking network health
-- Comprehensive metrics visualization
-- Reputation and performance tracking
-
-## 🛠 Technical Architecture
-
-### Backend
-- **Language**: Python 3.9+
-- **Web Framework**: Flask
-- **WebSocket**: Flask-SocketIO
-- **Database**: SQLite (development phase)
-
-### Frontend
-- **Technologies**: HTML5, Bootstrap 5
-- **Visualization**: Chart.js
-- **Real-time Updates**: WebSocket
-
-### Blockchain Integration (Planned)
-- Ethereum-compatible smart contracts
-- Layer 2 scaling solutions
-- Decentralized governance
-
-## 📦 Project Structure
-
-```
-daicn/
-│
-├── backend/           # Core backend logic
-├── dashboard/         # Web-based monitoring dashboard
-├── frontend/          # User interface components
-├── smart-contracts/   # Blockchain contract implementations
-├── requirements.txt   # Python dependencies
-└── README.md          # Project documentation
-```
-
-## 🔧 Quick Start Guide
+## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.9+
+- Python 3.11+
 - pip
-- virtualenv (recommended)
+- virtualenv
 
-### Installation Steps
-
-1. Clone the repository
+### Installation
 ```bash
 git clone https://github.com/yourusername/daicn.git
 cd daicn
-```
-
-2. Create and activate virtual environment
-```bash
 python -m venv venv
-source venv/bin/activate  # Unix/macOS
-venv\Scripts\activate     # Windows
-```
-
-3. Install dependencies
-```bash
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Start the dashboard
+### Running Tests
 ```bash
-cd dashboard
-flask run
+pytest
 ```
 
-## 📊 Network Dashboard Features
+### Running the Application
+```bash
+python -m backend.main
+```
 
-- Real-time network metrics
-- Provider performance tracking
-- Task status distribution
-- Network health assessment
+## 📊 Key Features
 
-### Key Metrics
-- Total Providers
-- Active Providers
-- Total Tasks
-- Average Provider Reputation
-- Network Health Score
+- **Decentralized Compute Infrastructure**
+- **Secure Authentication**
+- **Dynamic Task Allocation**
+- **Advanced Error Handling**
+- **Flexible Resource Management**
 
-## 🚧 Current Development Stage
+## 📝 Project Documentation
 
-### Completed
-- Basic network simulation
-- Real-time metrics dashboard
-- WebSocket communication
-- Metrics generation algorithm
+### Development Tracking
+- [Development Dashboard](Development dash.html): Real-time project status and performance metrics
+- [Development Log](DEVELOPMENT_LOG.md): Comprehensive project development history and insights
 
-### Upcoming
-- Full blockchain integration
-- Advanced task matching
-- Enhanced security features
-- Machine learning predictive analytics
+## 🔍 Documentation Resources
+
+- [Development Dashboard](Development%20dash.html)
+  - Provides real-time insights into project progress
+  - Tracks performance metrics
+  - Shows current development status
+
+- [Development Log](DEVELOPMENT_LOG.md)
+  - Detailed chronicle of project development
+  - Technical challenges and solutions
+  - Milestone tracking
+  - Strategic decision documentation
 
 ## 🤝 Contributing
 
-We welcome contributions! Please read our [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+Distributed under the MIT License.
 
-## 📞 Contact & Support
+## 📞 Contact
 
-Amos Tal  - [GitHub](https://github.com/AmosTal)
-[Project Support Channels]
+Your Name - your.email@example.com
 
-## 🌟 Star Us on GitHub!
-
-If you find this project interesting, please consider starring our repository to show your support!
+**[Star this project if you find it interesting!]**
